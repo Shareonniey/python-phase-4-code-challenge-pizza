@@ -66,35 +66,55 @@ def create_restaurant_pizza():
     data = request.get_json()
 
     try:
+       if not all(k in data for k in ('price', 'pizza_id', 'restaurant_id')):
+            return jsonify({"errors": [f"Missing required fields"]}), 400
+       price = data["price"]
+       restaurant_id = data["restaurant_id"]
+       pizza_id = data["pizza_id"]
+       if not isinstance(price, int) or price < 1 or price > 30:
+           return jsonify({"errors": ["validation errors"]}), 400
+       pizza = Pizza.query.get(pizza_id)
+       restaurant = Restaurant.query.get(restaurant_id)
+       if not pizza or not restaurant:
+           return jsonify({"errors": ["Pizza or Restaurant not found"]}), 404
+
        new_rp = RestaurantPizza(
-           price=data["price"],
-           restaurant_id=data["restaurant_id"],
-           pizza_id=data["pizza_id"]
+           price=price,
+           restaurant_id=restaurant_id,
+           pizza_id=pizza_id
                          )
 
        db.session.add(new_rp)
-       db.session.flush()
        db.session.commit()
-       return jsonify(new_rp.to_dict(
-        rules=("-restaurant.restaurant_pizzas",
-               "-pizza.restaurant_pizzas",)
-    )), 201
+       return jsonify({
+           "id": new_rp.id,
+           "price": new_rp.price,
+           "pizza_id": new_rp.pizza_id,
+           "restaurant_id": new_rp.restaurant_id,
+           "pizza":{
+               "id": pizza.id,
+               "name": pizza.name,
+               "ingredients": pizza.ingredients         
+               },
+            "restaurant":{
+                "id": restaurant.id,
+                "name": restaurant.name,
+                "address": restaurant.address
+                   
+               }
+
+       }), 201
+
     except ValueError as e:
+        db.session.rollback()
         return jsonify({"errors": [str(e)]}), 400
     except KeyError as e:
+        db.session.rollback()
         return jsonify({"errors": [f"Missing field: {str(e)}"]}), 400
         
     except Exception as e:
+        db.session.rollback()
         return jsonify({"errors": [str(e)]}), 400
-
-
-#
-
-#
-
-#
-#
-
-
+    
 if __name__ == "__main__":
     app.run(port=5555, debug=True)
